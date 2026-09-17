@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"finalServerProj/internal/variables"
+	"finalServerProj/internal/vars"
 )
 
 type Server struct {
@@ -26,9 +26,9 @@ func New(l *slog.Logger) *Server {
 
 func (s *Server) CaseHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		r.Body = http.MaxBytesReader(w, r.Body, variables.MaxRequestSize)
+		r.Body = http.MaxBytesReader(w, r.Body, vars.MaxRequestSize)
 
-		if err := r.ParseMultipartForm(variables.MaxMemory); err != nil {
+		if err := r.ParseMultipartForm(vars.MaxMemory); err != nil {
 			slog.Warn("request size exceeded or parse error", slog.String("error", err.Error()))
 			http.Error(w, "request size is too bit or invalid", http.StatusRequestEntityTooLarge)
 			return
