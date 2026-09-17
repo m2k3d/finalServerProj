@@ -1,21 +1,39 @@
 package main
 
 import (
+	"log/slog"
 	"net/http"
+	"os"
+	"time"
 
 	"finalServerProj/internal/handlers"
 	"finalServerProj/internal/logging"
+	"finalServerProj/internal/variables"
 )
-
-const addr = ":8080"
 
 func main() {
 	mux := http.NewServeMux()
 
 	logger := logging.New()
-	h := handlers.New(logger)
+	server := handlers.New(logger)
 
-	mux.HandleFunc("/api/v1/entities", handlers.CaseHandler)
+	logger.Info("Server started", slog.String("addr", variables.Addr))
 
-	// logger.Info("Server started", slog.String("addr", addr))
+	srv := &http.Server{
+		Addr:         ":8080",
+		Handler:      mux,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 60 * time.Second,
+		IdleTimeout:  120 * time.Second,
+
+		ReadHeaderTimeout: 10 * time.Second,
+		MaxHeaderBytes:    1 << 20,
+	}
+
+	mux.HandleFunc("/api/v1/entities", server.CaseHandler())
+
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		slog.Error("Server error", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
 }
