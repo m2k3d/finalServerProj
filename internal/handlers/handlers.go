@@ -1,21 +1,22 @@
 package handlers
 
 import (
+	"errors"
+	"fmt"
+	"io"
 	"log/slog"
+	"mime/multipart"
 	"net/http"
+	"os"
+	"path/filepath"
 
-	"finalServerProj/internal/vars"
+	"finalServerProj/internal/v"
+
+	"github.com/google/uuid"
 )
 
 type Server struct {
 	logger *slog.Logger
-}
-
-type Dessier struct {
-	Name            string   `json:"name"`
-	Description     string   `json:"description"`
-	ThreatLevel     int      `json:"treat_level"`
-	Vulnerabilities []string `json:"Vulnerabilities"`
 }
 
 func New(l *slog.Logger) *Server {
@@ -26,20 +27,132 @@ func New(l *slog.Logger) *Server {
 
 func (s *Server) CaseHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		r.Body = http.MaxBytesReader(w, r.Body, vars.MaxRequestSize)
+		r.Body = http.MaxBytesReader(w, r.Body, v.MaxRequestSize)
 
-		if err := r.ParseMultipartForm(vars.MaxMemory); err != nil {
-			slog.Warn("request size exceeded or parse error", slog.String("error", err.Error()))
-			http.Error(w, "request size is too bit or invalid", http.StatusRequestEntityTooLarge)
+		if err := r.ParseMultipartForm(v.MaxMemory); err != nil {
+			var maxErr *http.MaxBytesError
+			if errors.As(err, &maxErr) {
+				http.Error(w, `{"error":"request body exceeds 20MB limit"}`, http.StatusRequestEntityTooLarge)
+			} else {
+				http.Error(w, `{"error":"malformed multipart form"}`, http.StatusBadRequest)
+			}
 			return
 		}
+
 		defer r.MultipartForm.RemoveAll()
 
-		w.Header().Set("Content-Type", "multipart/form-data")
+		files := r.MultipartForm.File["evidence"]
+		if len(files) == 0 {
+			http.Error(w, "field \" evidence \" doesn't contain a file", http.StatusBadRequest)
+			return
+		}
+
+		response := v.UploadResponse{
+			DossierID:      "",
+			Status:         "",
+			SavedEvidence:  make([]string, 0),
+			FailedEvidence: make([]v.FailedEvidence, 0),
+		}
+
+		for _, fileHeader := range files {
+			filename, err := processSingleFile(fileHeader)
+			if err != nil {
+				// Если один файл с ошибкой, мы логируем это, добавляем в список Failed и идем дальше!
+				slog.Error("error uploading specific file",
+					slog.String("filename", fileHeader.Filename),
+					slog.String("error", err.Error()),
+				)
+				//				response.FailedEvidence = append(response.FailedEvidence, fileHeader.) // не знаю
+				continue
+			}
+
+			// Если успех - сохраняем данные
+			response.SavedEvidence = append(response.SavedEvidence, filename)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
 
 		s.logger.Info("Request handled",
 			slog.String("path", r.URL.Path),
 			slog.String("method", r.Method),
 		)
 	}
+}
+
+func processSingleFile(fh *multipart.FileHeader) (string, error) {
+	// Базовая защита от Path Traversal атак
+	filename := filepath.Base(fh.Filename)
+	if filename == "" || filename == "." || filename == ".." {
+		return "", fmt.Errorf("invalid file name")
+	}
+
+	// Быстрая проверка по расширению (первичный фильтр)
+
+	if fh.Size > v.MaxMemory { // > 3 mb?
+		return "", fmt.Errorf("file too large: %d bytes", fh.Size)
+	}
+	if fh.Size == 0 { // == 0 mb?
+		return "", fmt.Errorf("file is empty: %d bytes", fh.Size)
+	}
+
+	// Открываем файл
+	file, err := fh.Open()
+	if err != nil {
+		return "", fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	// Проверяем MIME-тип по сигнатуре (первые 512 байт).
+	// Это защищает от простой подмены расширения, но не от специально сфабрикованных файлов.
+	// Для критичных сценариев используйте специализированные библиотеки.
+	buffer := make([]byte, 512)
+	extByMime := map[string]string{
+		"image/jpeg": ".jpg", "image/png": ".png",
+	}
+	mimeType := http.DetectContentType(buffer)
+	ext, ok := extByMime[mimeType]
+	if !ok {
+		return "", fmt.Errorf("invalid mime type: %s", mimeType)
+	}
+
+	uniqueFilename := uuid.NewString() + ext
+
+	// Обязательно возвращаем указатель чтения обратно в начало файла!
+	// Иначе мы сохраним картинку без первых 512 байт, и она будет битой.
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return "", fmt.Errorf("failed to reset file pointer: %w", err)
+	}
+
+	mimeType := http.DetectContentType(buffer)
+	allowedMime := map[string]struct{}{
+		"image/jpeg": {},
+		"image/png":  {},
+	}
+	if _, ok := allowedMime[mimeType]; !ok {
+		return "", fmt.Errorf("fake file detected. expected image, got: %s", mimeType)
+	}
+
+	// Генерируем уникальное имя (UUID), чтобы избежать коллизий при совпадении имен
+	uniqueFilename := uuid.NewString() + ext
+	dstPath := filepath.Join(v.EvidenceUploadDir, uniqueFilename)
+
+	// Создаем файл на диске
+	dst, err := os.Create(dstPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to create file on disk: %w", err)
+	}
+	defer dst.Close()
+
+	// Копируем данные из оперативной памяти/временного файла в постоянный
+	if _, err := io.Copy(dst, file); err != nil {
+		if rmErr := os.Remove(dstPath); rmErr != nil {
+			slog.Error("failed to remove corrupted file",
+				slog.String("path", dstPath),
+				slog.String("error", rmErr.Error()),
+			)
+		}
+		return "", fmt.Errorf("error writing file: %w", err)
+	}
+
+	return uniqueFilename, nil
 }

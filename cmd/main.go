@@ -5,30 +5,44 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"finalServerProj/internal/handlers"
 	"finalServerProj/internal/logging"
-	"finalServerProj/internal/vars"
+	"finalServerProj/internal/v"
 )
 
 func main() {
-	// cli part
-	flag.StringVar(&vars.Addr, "addr", ":8080", "addres")
-	flag.StringVar(&vars.StoragePath, "storage", "./storage", "path to the storage")
+	// CLI PART
+	flag.StringVar(&v.Addr, "addr", ":8080", "addres")
+	flag.StringVar(&v.StoragePath, "storage", "./storage", "path to the storage")
 
 	flag.Parse()
 
-	// server part
-	mux := http.NewServeMux()
-
+	// SERVER PART
 	logger := logging.New()
 	server := handlers.New(logger)
 
-	logger.Info("Server started", slog.String("addr", vars.Addr))
+	// creating two dirictories for files
+	v.EntitiesUploadDir = filepath.Join(v.StoragePath, v.EntitiesUploadDir)
+	v.EvidenceUploadDir = filepath.Join(v.StoragePath, v.EvidenceUploadDir)
+
+	if err := os.MkdirAll(v.EntitiesUploadDir, 0o755); err != nil {
+		slog.Error("Failed to create upload directory", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+	if err := os.MkdirAll(v.EvidenceUploadDir, 0o755); err != nil {
+		slog.Error("Failed to create upload directory", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+
+	mux := http.NewServeMux()
+
+	logger.Info("Server started", slog.String("addr", v.Addr))
 
 	srv := &http.Server{
-		Addr:         vars.Addr,
+		Addr:         v.Addr,
 		Handler:      mux,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
