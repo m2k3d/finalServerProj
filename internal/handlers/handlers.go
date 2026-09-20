@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -62,7 +63,14 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 					slog.String("filename", fileHeader.Filename),
 					slog.String("error", err.Error()),
 				)
-				//				response.FailedEvidence = append(response.FailedEvidence, fileHeader.) // не знаю
+
+				failed := v.FailedEvidence{
+					OriginalFilename: fileHeader.Filename,
+					Reason:           err.Error(),
+				}
+
+				response.FailedEvidence = append(response.FailedEvidence, failed)
+
 				continue
 			}
 
@@ -72,10 +80,18 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 
-		s.logger.Info("Request handled",
-			slog.String("path", r.URL.Path),
-			slog.String("method", r.Method),
-		)
+		switch {
+		case len(response.SavedEvidence) == 0:
+			w.WriteHeader(http.StatusBadRequest)
+		case len(response.FailedEvidence) != 0:
+			w.WriteHeader(http.StatusMultiStatus)
+		default:
+			w.WriteHeader(http.StatusCreated)
+		}
+
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			slog.Error("failed to send JSON response", slog.String("error", err.Error()))
+		}
 	}
 }
 
@@ -88,10 +104,10 @@ func processSingleFile(fh *multipart.FileHeader) (string, error) {
 
 	// Быстрая проверка по расширению (первичный фильтр)
 	if fh.Size == 0 { // == 0 mb?
-		return "", fmt.Errorf("file is empty: %d bytes", fh.Size)
+		return "", fmt.Errorf("file_empty")
 	}
 	if fh.Size > v.MaxMemory { // > 3 mb?
-		return "", fmt.Errorf("file too large: %d bytes", fh.Size)
+		return "", fmt.Errorf("file_too_large")
 	}
 
 	// Открываем файл
@@ -118,7 +134,7 @@ func processSingleFile(fh *multipart.FileHeader) (string, error) {
 	mimeType := http.DetectContentType(buffer)
 	ext, ok := extByMime[mimeType]
 	if !ok {
-		return "", fmt.Errorf("invalid mime type: %s", mimeType)
+		return "", fmt.Errorf("invalid_mime_type")
 	}
 
 	uniqueFilename := uuid.NewString() + ext
