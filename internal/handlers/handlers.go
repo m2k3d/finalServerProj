@@ -87,12 +87,11 @@ func processSingleFile(fh *multipart.FileHeader) (string, error) {
 	}
 
 	// Быстрая проверка по расширению (первичный фильтр)
-
-	if fh.Size > v.MaxMemory { // > 3 mb?
-		return "", fmt.Errorf("file too large: %d bytes", fh.Size)
-	}
 	if fh.Size == 0 { // == 0 mb?
 		return "", fmt.Errorf("file is empty: %d bytes", fh.Size)
+	}
+	if fh.Size > v.MaxMemory { // > 3 mb?
+		return "", fmt.Errorf("file too large: %d bytes", fh.Size)
 	}
 
 	// Открываем файл
@@ -106,6 +105,13 @@ func processSingleFile(fh *multipart.FileHeader) (string, error) {
 	// Это защищает от простой подмены расширения, но не от специально сфабрикованных файлов.
 	// Для критичных сценариев используйте специализированные библиотеки.
 	buffer := make([]byte, 512)
+	if _, err := file.Read(buffer); err != nil && err != io.EOF {
+		return "", fmt.Errorf("error reading file header: %w", err)
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return "", fmt.Errorf("failed to reset file pointer: %w", err)
+	}
+
 	extByMime := map[string]string{
 		"image/jpeg": ".jpg", "image/png": ".png",
 	}
@@ -115,24 +121,6 @@ func processSingleFile(fh *multipart.FileHeader) (string, error) {
 		return "", fmt.Errorf("invalid mime type: %s", mimeType)
 	}
 
-	uniqueFilename := uuid.NewString() + ext
-
-	// Обязательно возвращаем указатель чтения обратно в начало файла!
-	// Иначе мы сохраним картинку без первых 512 байт, и она будет битой.
-	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return "", fmt.Errorf("failed to reset file pointer: %w", err)
-	}
-
-	mimeType := http.DetectContentType(buffer)
-	allowedMime := map[string]struct{}{
-		"image/jpeg": {},
-		"image/png":  {},
-	}
-	if _, ok := allowedMime[mimeType]; !ok {
-		return "", fmt.Errorf("fake file detected. expected image, got: %s", mimeType)
-	}
-
-	// Генерируем уникальное имя (UUID), чтобы избежать коллизий при совпадении имен
 	uniqueFilename := uuid.NewString() + ext
 	dstPath := filepath.Join(v.EvidenceUploadDir, uniqueFilename)
 
