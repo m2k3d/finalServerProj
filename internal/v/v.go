@@ -20,8 +20,8 @@ var (
 type Dossier struct {
 	Name            string   `json:"name"`
 	Description     string   `json:"description"`
-	ThreatLevel     int      `json:"treat_level"`
-	Vulnerabilities []string `json:"Vulnerabilities"`
+	ThreatLevel     int      `json:"threat_level"`
+	Vulnerabilities []string `json:"vulnerabilities"`
 }
 
 type FailedEvidence struct {
@@ -34,4 +34,13 @@ type UploadResponse struct {
 	Status         string           `json:"status"`
 	SavedEvidence  []string         `json:"saved_evidence"`
 	FailedEvidence []FailedEvidence `json:"failed_evidence"`
+}
+
+type StoredEntity struct {
+	ID              string   `json:"id"`
+	Name            string   `json:"name"`
+	Description     string   `json:"description"`
+	ThreatLevel     int      `json:"threat_level"`
+	Vulnerabilities []string `json:"vulnerabilities"`
+	EvidenceFiles   []string `json:"evidence_files"` // names without urls
 }
