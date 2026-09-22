@@ -46,20 +46,20 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 
 		dossierValues := r.MultipartForm.Value["dossier"]
 		if len(dossierValues) == 0 {
-			http.Error(w, "field \" dossier \" doesn't contain a file", http.StatusBadRequest)
+			writeJsonHandler(w, "field \" dossier \" doesn't contain a file", http.StatusBadRequest)
 			return
 		}
 
 		var dossier v.Dossier
 		if err := json.Unmarshal([]byte(dossierValues[0]), &dossier); err != nil {
-			http.Error(w, "error while trying to unmarshall the dossier", http.StatusBadRequest)
+			writeJsonHandler(w, "error while trying to unmarshall the dossier", http.StatusBadRequest)
 			return
 
 		}
 
 		err := processDossie(dossier)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid dossie: %s", err.Error()), http.StatusBadRequest)
+			writeJsonHandler(w, fmt.Sprintf("invalid dossie: %s", err.Error()), http.StatusBadRequest)
 			return
 		}
 
@@ -67,7 +67,11 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 
 		evidenceFiles := r.MultipartForm.File["evidence"]
 		if len(evidenceFiles) == 0 {
-			http.Error(w, "field \" evidence \" doesn't contain a file", http.StatusBadRequest)
+			writeJsonHandler(w, "field \" evidence \" doesn't contain a file", http.StatusBadRequest)
+			return
+		}
+		if len(evidenceFiles) > v.MaxEvidenceFiles {
+			writeJsonHandler(w, "field \" evidence \" contains more than 10 files", http.StatusBadRequest)
 			return
 		}
 
@@ -98,7 +102,7 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 			response.SavedEvidence = append(response.SavedEvidence, filename)
 		}
 		if len(response.SavedEvidence) == 0 {
-			http.Error(w, "there is not a saved evidence", http.StatusBadRequest)
+			writeJsonHandler(w, "there is not a saved evidence", http.StatusBadRequest)
 			return
 		}
 
@@ -116,15 +120,15 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 
 		data, err := json.Marshal(storedEntity)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to marshall entity: %s", err.Error()), http.StatusInternalServerError)
+			writeJsonHandler(w, "failed to marshall entity", http.StatusInternalServerError)
 			return
 		}
 		if err := os.WriteFile(tmpPath, data, 0o644); err != nil {
-			http.Error(w, fmt.Sprintf("failed to write file: %s", err.Error()), http.StatusInternalServerError)
+			writeJsonHandler(w, "failed to write file", http.StatusInternalServerError)
 			return
 		}
 		if err := os.Rename(tmpPath, finalPath); err != nil {
-			http.Error(w, fmt.Sprintf("failed to rename file: %s", err.Error()), http.StatusInternalServerError)
+			writeJsonHandler(w, "failed to rename file", http.StatusInternalServerError)
 			return
 		}
 
@@ -205,6 +209,12 @@ func processSingleFile(fh *multipart.FileHeader) (string, error) {
 	}
 
 	return uniqueFilename, nil
+}
+
+func writeJsonHandler(w http.ResponseWriter, errMsg string, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(map[string]string{"error": errMsg})
 }
 
 func processDossie(d v.Dossier) error {
