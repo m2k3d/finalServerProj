@@ -4,6 +4,7 @@ const (
 	MaxRequestSize   = 20 << 20 // 20 mb
 	MaxMemory        = 3 << 20  // 3 mb
 	MaxEvidenceFiles = 10
+	MaxDossierSize   = 1 << 20 // 1 mb
 )
 
 var SafeExtensions = map[string]struct{}{

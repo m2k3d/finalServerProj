@@ -50,11 +50,15 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 			return
 		}
 
+		if len(dossierValues[0]) > v.MaxDossierSize {
+			writeJsonHandler(w, "dossier json size exceeds 1MB limit", http.StatusBadRequest)
+			return
+		}
+
 		var dossier v.Dossier
 		if err := json.Unmarshal([]byte(dossierValues[0]), &dossier); err != nil {
 			writeJsonHandler(w, "error while trying to unmarshall the dossier", http.StatusBadRequest)
 			return
-
 		}
 
 		err := processDossie(dossier)
@@ -224,6 +228,12 @@ func processDossie(d v.Dossier) error {
 	}
 	if strings.TrimSpace(d.Description) == "" {
 		return errors.New("the dossie doesn't contain the description")
+	}
+	if d.ThreatLevel < 1 || d.ThreatLevel > 10 {
+		return errors.New("the dossie's threat level is incorrect")
+	}
+	if len(d.Vulnerabilities) == 0 {
+		return errors.New("the dossie's vulnerabilitie is empty")
 	}
 	return nil
 }
