@@ -139,6 +139,7 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 			w.WriteHeader(http.StatusMultiStatus)
 		} else {
 			response.Status = "success"
+			w.Header().Set("Location", "/api/v1/entities/"+dossierID)
 			w.WriteHeader(http.StatusCreated)
 		}
 
