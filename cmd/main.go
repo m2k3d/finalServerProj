@@ -52,7 +52,9 @@ func main() {
 		MaxHeaderBytes:    1 << 20,
 	}
 
-	mux.HandleFunc("/api/v1/entities", server.CaseHandler())
+	mux.HandleFunc("POST /api/v1/entities", server.CaseHandler())
+	mux.HandleFunc("GET /api/v1/entities/{id}", server.GetEntityHandler())
+	mux.HandleFunc("GET /api/v1/evidence/{filename}", server.GetEvidenceHandler())
 
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		slog.Error("Server error", slog.String("error", err.Error()))

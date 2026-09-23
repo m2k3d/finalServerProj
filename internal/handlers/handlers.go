@@ -237,3 +237,49 @@ func processDossie(d v.Dossier) error {
 	}
 	return nil
 }
+
+func (s *Server) GetEntityHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("id")
+
+		filePath := filepath.Join(v.EntitiesUploadDir, id+".json")
+
+		jsonFile, err := os.ReadFile(filePath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				writeJsonHandler(w, "the file doesn't exist", http.StatusNotFound)
+				return
+			}
+			writeJsonHandler(w, "something went wrong", http.StatusBadGateway)
+			return
+		}
+
+		var entity v.StoredEntity
+		err = json.Unmarshal(jsonFile, &entity)
+		if err != nil {
+			writeJsonHandler(w, "something went wrong", http.StatusBadGateway)
+			return
+		}
+
+		evidenceUrl := v.EvidenceUrls{
+			ID:              entity.ID,
+			Name:            entity.Name,
+			Description:     entity.Description,
+			ThreatLevel:     entity.ThreatLevel,
+			Vulnerabilities: entity.Vulnerabilities,
+			// 	EvidenceURLs
+		}
+		for _, filename := range entity.EvidenceFiles {
+			evidenceUrl.EvidenceURLs = append(evidenceUrl.EvidenceURLs, "/api/v1/evidence/"+filename)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(evidenceUrl)
+	}
+}
+
+func (s *Server) GetEvidenceHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "not implemented", http.StatusNotImplemented)
+	}
+}

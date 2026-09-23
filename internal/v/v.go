@@ -45,3 +45,12 @@ type StoredEntity struct {
 	Vulnerabilities []string `json:"vulnerabilities"`
 	EvidenceFiles   []string `json:"evidence_files"` // names without urls
 }
+
+type EvidenceUrls struct {
+	ID              string   `json:"id"`
+	Name            string   `json:"name"`
+	Description     string   `json:"description"`
+	ThreatLevel     int      `json:"threat_level"`
+	Vulnerabilities []string `json:"vulnerabilities"`
+	EvidenceURLs    []string `json:"evidence_urls"`
+}
