@@ -261,7 +261,7 @@ func (s *Server) GetEntityHandler() http.HandlerFunc {
 			return
 		}
 
-		evidenceUrl := v.EvidenceUrls{
+		response := v.EntityResponse{
 			ID:              entity.ID,
 			Name:            entity.Name,
 			Description:     entity.Description,
@@ -270,16 +270,43 @@ func (s *Server) GetEntityHandler() http.HandlerFunc {
 			// 	EvidenceURLs
 		}
 		for _, filename := range entity.EvidenceFiles {
-			evidenceUrl.EvidenceURLs = append(evidenceUrl.EvidenceURLs, "/api/v1/evidence/"+filename)
+			response.EvidenceURLs = append(response.EvidenceURLs, "/api/v1/evidence/"+filename)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(evidenceUrl)
+		json.NewEncoder(w).Encode(response)
 	}
 }
 
 func (s *Server) GetEvidenceHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "not implemented", http.StatusNotImplemented)
+		unsafePath := r.PathValue("filename")
+
+		safeName := filepath.Base(unsafePath)
+		path := filepath.Join(v.EvidenceUploadDir, safeName)
+
+		file, err := os.Open(path)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				writeJsonHandler(w, "file is not exist", http.StatusNotFound)
+			} else {
+				writeJsonHandler(w, "something went wrong", http.StatusNotFound)
+			}
+			return
+		}
+		defer file.Close()
+
+		// check is dir?
+		fileInfo, err := file.Stat()
+		if err != nil {
+			writeJsonHandler(w, "can't get the file statistic", http.StatusNotFound)
+			return
+		}
+		if fileInfo.IsDir() {
+			writeJsonHandler(w, "file is a dirictory", http.StatusNotFound)
+			return
+		}
+
+		http.ServeContent(w, r, fileInfo.Name(), fileInfo.ModTime(), file)
 	}
 }

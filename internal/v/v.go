@@ -46,7 +46,7 @@ type StoredEntity struct {
 	EvidenceFiles   []string `json:"evidence_files"` // names without urls
 }
 
-type EvidenceUrls struct {
+type EntityResponse struct {
 	ID              string   `json:"id"`
 	Name            string   `json:"name"`
 	Description     string   `json:"description"`
