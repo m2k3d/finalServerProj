@@ -41,9 +41,11 @@ func main() {
 
 	logger.Info("Server started", slog.String("addr", v.Addr))
 
+	wrapped := server.RecoveryMiddleware(mux)
+
 	srv := &http.Server{
 		Addr:         v.Addr,
-		Handler:      mux,
+		Handler:      wrapped,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  60 * time.Second,

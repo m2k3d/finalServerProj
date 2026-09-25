@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 
 	"finalServerProj/internal/v"
@@ -245,4 +246,21 @@ func (s *Server) GetEvidenceHandler() http.HandlerFunc {
 
 		http.ServeContent(w, r, fileInfo.Name(), fileInfo.ModTime(), file)
 	}
+}
+
+func (s *Server) RecoveryMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if err := recover(); err != nil {
+				// Логируем саму ошибку и стек-трейс, чтобы понять, где именно упал код
+				s.logger.Error("panic",
+					slog.Any("error", err),
+					slog.String("stack", string(debug.Stack())),
+				)
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			}
+		}()
+
+		next.ServeHTTP(w, r)
+	})
 }
