@@ -89,6 +89,21 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 		for _, fileHeader := range evidenceFiles {
 			filename, err := processSingleFile(fileHeader)
 			if err != nil {
+				if errors.Is(err, ErrInfra) {
+					for _, name := range response.SavedEvidence {
+						if err := os.Remove(filepath.Join(v.EvidenceUploadDir, name)); err != nil {
+							slog.Error("error removing the file",
+								slog.String("filename", name),
+								slog.String("error", err.Error()),
+							)
+						}
+					}
+
+					writeJsonHandler(w, "failed to save evidence", http.StatusInternalServerError)
+
+					return
+				}
+
 				slog.Error("error uploading specific file",
 					slog.String("filename", fileHeader.Filename),
 					slog.String("error", err.Error()),
@@ -108,6 +123,7 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 
 			response.SavedEvidence = append(response.SavedEvidence, filename)
 		}
+
 		if len(response.SavedEvidence) == 0 {
 			writeJsonHandler(w, "there is not a saved evidence", http.StatusBadRequest)
 			return
@@ -131,11 +147,29 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 			return
 		}
 		if err := os.WriteFile(tmpPath, data, 0o644); err != nil {
+			for _, name := range response.SavedEvidence {
+				if err := os.Remove(filepath.Join(v.EvidenceUploadDir, name)); err != nil {
+					slog.Error("error removing the file",
+						slog.String("filename", name),
+						slog.String("error", err.Error()),
+					)
+				}
+			}
+
 			writeJsonHandler(w, "failed to write file", http.StatusInternalServerError)
 			return
 		}
 		if err := os.Rename(tmpPath, finalPath); err != nil {
-			writeJsonHandler(w, "failed to rename file", http.StatusInternalServerError)
+			for _, name := range response.SavedEvidence {
+				if err := os.Remove(filepath.Join(v.EvidenceUploadDir, name)); err != nil {
+					slog.Error("error removing the file",
+						slog.String("filename", name),
+						slog.String("error", err.Error()),
+					)
+				}
+			}
+
+			writeJsonHandler(w, "failed to write file", http.StatusInternalServerError)
 			return
 		}
 

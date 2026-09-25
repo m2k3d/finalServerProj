@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -15,6 +16,8 @@ import (
 
 	"github.com/google/uuid"
 )
+
+var ErrInfra = errors.New("infra_error")
 
 func paranormalIndex(savedSizes []int64, total int) float64 {
 	var sum int64
@@ -76,7 +79,7 @@ func processSingleFile(fh *multipart.FileHeader) (string, error) {
 	// Создаем файл на диске
 	dst, err := os.Create(dstPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to create file on disk: %w", err)
+		return "", fmt.Errorf("%w: %w", err, ErrInfra)
 	}
 	defer dst.Close()
 
@@ -88,7 +91,7 @@ func processSingleFile(fh *multipart.FileHeader) (string, error) {
 				slog.String("error", rmErr.Error()),
 			)
 		}
-		return "", fmt.Errorf("error writing file: %w", err)
+		return "", fmt.Errorf("%w: %w", err, ErrInfra)
 	}
 
 	return uniqueFilename, nil
