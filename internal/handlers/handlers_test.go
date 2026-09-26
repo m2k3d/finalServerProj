@@ -118,7 +118,7 @@ func decodeErrorResponse(t *testing.T, rr *httptest.ResponseRecorder) string {
 	return resp["error"]
 }
 
-// Поле dossier отсутствует в форме — ожидаем 400.
+// Поле dossier отсутствует в форме - ожидаем 400.
 func TestCaseHandler_MissingDossier(t *testing.T) {
 	setupStorage(t)
 	srv := newTestServer()
@@ -133,7 +133,7 @@ func TestCaseHandler_MissingDossier(t *testing.T) {
 	}
 }
 
-// dossier содержит невалидный JSON — ожидаем 400.
+// dossier содержит невалидный JSON - ожидаем 400.
 func TestCaseHandler_InvalidJSON(t *testing.T) {
 	setupStorage(t)
 	srv := newTestServer()
@@ -150,7 +150,7 @@ func TestCaseHandler_InvalidJSON(t *testing.T) {
 }
 
 // dossier структурно валиден, но нарушает бизнес-правила (пустые поля,
-// threat_level вне диапазона, пустой vulnerabilities) — ожидаем 400.
+// threat_level вне диапазона, пустой vulnerabilities) - ожидаем 400.
 func TestCaseHandler_DossierValidationFailures(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -182,7 +182,7 @@ func TestCaseHandler_DossierValidationFailures(t *testing.T) {
 	}
 }
 
-// Поле dossier больше 1MB — ожидаем 400 с конкретным текстом ошибки.
+// Поле dossier больше 1MB - ожидаем 400 с конкретным текстом ошибки.
 func TestCaseHandler_DossierTooLarge(t *testing.T) {
 	setupStorage(t)
 	srv := newTestServer()
@@ -201,7 +201,7 @@ func TestCaseHandler_DossierTooLarge(t *testing.T) {
 	}
 }
 
-// Поле evidence отсутствует (файлов 0) — ожидаем 400.
+// Поле evidence отсутствует (файлов 0) - ожидаем 400.
 func TestCaseHandler_NoEvidenceFiles(t *testing.T) {
 	setupStorage(t)
 	srv := newTestServer()
@@ -217,7 +217,7 @@ func TestCaseHandler_NoEvidenceFiles(t *testing.T) {
 	}
 }
 
-// Файлов evidence больше 10 — ожидаем 400.
+// Файлов evidence больше 10 - ожидаем 400.
 func TestCaseHandler_TooManyEvidenceFiles(t *testing.T) {
 	setupStorage(t)
 	srv := newTestServer()
@@ -237,7 +237,7 @@ func TestCaseHandler_TooManyEvidenceFiles(t *testing.T) {
 	}
 }
 
-// Все файлы evidence не проходят валидацию — ожидаем 400 и что на диске
+// Все файлы evidence не проходят валидацию - ожидаем 400 и что на диске
 // не появилось ни JSON-досье, ни файлов улик (сохранять было нечего).
 func TestCaseHandler_AllEvidenceInvalid_NoRollbackNeeded(t *testing.T) {
 	setupStorage(t)
@@ -268,7 +268,7 @@ func TestCaseHandler_AllEvidenceInvalid_NoRollbackNeeded(t *testing.T) {
 	}
 }
 
-// Все файлы evidence валидны — ожидаем 201, Location, saved_evidence
+// Все файлы evidence валидны - ожидаем 201, Location, saved_evidence
 // с URL-ами и что на диске появились и JSON-досье, и файлы улик.
 func TestCaseHandler_Success(t *testing.T) {
 	setupStorage(t)
@@ -343,7 +343,7 @@ func TestCaseHandler_Success(t *testing.T) {
 	}
 }
 
-// Часть файлов evidence валидна, часть — нет (все 3 причины отказа) —
+// Часть файлов evidence валидна, часть - нет (все 3 причины отказа) -
 // ожидаем 207, без Location, в досье на диске только валидные улики.
 func TestCaseHandler_PartialSuccess(t *testing.T) {
 	setupStorage(t)
@@ -408,7 +408,7 @@ func TestCaseHandler_PartialSuccess(t *testing.T) {
 	}
 }
 
-// Тело запроса не является валидной multipart-формой — ожидаем 400.
+// Тело запроса не является валидной multipart-формой - ожидаем 400.
 func TestCaseHandler_MalformedMultipart(t *testing.T) {
 	setupStorage(t)
 	srv := newTestServer()
@@ -424,7 +424,7 @@ func TestCaseHandler_MalformedMultipart(t *testing.T) {
 	}
 }
 
-// Общий размер тела запроса больше 20MB — ожидаем 413.
+// Общий размер тела запроса больше 20MB - ожидаем 413.
 func TestCaseHandler_RequestBodyTooLarge(t *testing.T) {
 	setupStorage(t)
 	srv := newTestServer()
