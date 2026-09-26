@@ -34,9 +34,9 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 		if err := r.ParseMultipartForm(v.MaxMemory); err != nil {
 			var maxErr *http.MaxBytesError
 			if errors.As(err, &maxErr) {
-				http.Error(w, "{\"error\":\"request body exceeds 20MB limit\"}", http.StatusRequestEntityTooLarge)
+				writeJsonHandler(w, "request body exceeds 20MB limit", http.StatusRequestEntityTooLarge)
 			} else {
-				http.Error(w, "{\"error\":\"malformed multipart form\"}", http.StatusBadRequest)
+				writeJsonHandler(w, "malformed multipart form", http.StatusBadRequest)
 			}
 			return
 		}
@@ -156,6 +156,13 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 				}
 			}
 
+			if err := os.Remove(filepath.Join(tmpPath)); err != nil {
+				slog.Error("error removing the file",
+					slog.String("filename", tmpPath),
+					slog.String("error", err.Error()),
+				)
+			}
+
 			writeJsonHandler(w, "failed to write file", http.StatusInternalServerError)
 			return
 		}
@@ -167,6 +174,13 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 						slog.String("error", err.Error()),
 					)
 				}
+			}
+
+			if err := os.Remove(filepath.Join(tmpPath)); err != nil {
+				slog.Error("error removing the file",
+					slog.String("filename", tmpPath),
+					slog.String("error", err.Error()),
+				)
 			}
 
 			writeJsonHandler(w, "failed to write file", http.StatusInternalServerError)
@@ -291,7 +305,8 @@ func (s *Server) RecoveryMiddleware(next http.Handler) http.Handler {
 					slog.Any("error", err),
 					slog.String("stack", string(debug.Stack())),
 				)
-				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+
+				writeJsonHandler(w, "Internal Server Error", http.StatusInternalServerError)
 			}
 		}()
 
