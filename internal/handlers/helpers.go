@@ -64,11 +64,8 @@ func processSingleFile(fh *multipart.FileHeader) (string, error) {
 		return "", fmt.Errorf("failed to reset file pointer: %w", err)
 	}
 
-	extByMime := map[string]string{
-		"image/jpeg": ".jpg", "image/png": ".png",
-	}
 	mimeType := http.DetectContentType(buffer)
-	ext, ok := extByMime[mimeType]
+	ext, ok := v.SafeExtensions[mimeType]
 	if !ok {
 		return "", fmt.Errorf("invalid_mime_type")
 	}

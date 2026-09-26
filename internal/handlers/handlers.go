@@ -187,6 +187,12 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 			return
 		}
 
+		var diskWrite []string
+		for _, name := range response.SavedEvidence {
+			diskWrite = append(diskWrite, "/api/v1/evidence/"+name)
+		}
+		response.SavedEvidence = diskWrite
+
 		w.Header().Set("Content-Type", "application/json")
 
 		if len(response.FailedEvidence) != 0 {
@@ -235,14 +241,14 @@ func (s *Server) GetEntityHandler() http.HandlerFunc {
 				writeJsonHandler(w, "the file doesn't exist", http.StatusNotFound)
 				return
 			}
-			writeJsonHandler(w, "something went wrong", http.StatusBadGateway)
+			writeJsonHandler(w, "something went wrong", http.StatusInternalServerError)
 			return
 		}
 
 		var entity v.StoredEntity
 		err = json.Unmarshal(jsonFile, &entity)
 		if err != nil {
-			writeJsonHandler(w, "something went wrong", http.StatusBadGateway)
+			writeJsonHandler(w, "something went wrong", http.StatusInternalServerError)
 			return
 		}
 

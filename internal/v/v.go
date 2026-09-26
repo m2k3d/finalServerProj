@@ -7,8 +7,8 @@ const (
 	MaxDossierSize   = 1 << 20 // 1 mb
 )
 
-var SafeExtensions = map[string]struct{}{
-	"jpeg": {}, "png": {},
+var SafeExtensions = map[string]string{
+	"image/jpeg": ".jpg", "image/png": ".png",
 }
 
 var (
