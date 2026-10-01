@@ -233,6 +233,11 @@ func (s *Server) GetEntityHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 
+		if _, err := uuid.Parse(id); err != nil {
+			writeJsonHandler(w, "invalid id", http.StatusBadRequest)
+			return
+		}
+
 		filePath := filepath.Join(v.EntitiesUploadDir, id+".json")
 
 		jsonFile, err := os.ReadFile(filePath)

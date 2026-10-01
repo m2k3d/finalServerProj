@@ -14,6 +14,8 @@ import (
 	"testing"
 
 	"finalServerProj/internal/v"
+
+	"github.com/google/uuid"
 )
 
 func newTestServer() *Server {
@@ -441,5 +443,63 @@ func TestCaseHandler_RequestBodyTooLarge(t *testing.T) {
 
 	if rr.Code != http.StatusRequestEntityTooLarge {
 		t.Fatalf("expected 413, got %d, body: %s", rr.Code, rr.Body.String())
+	}
+}
+
+// id, который не является UUID (в том числе попытка path traversal), -
+// ожидаем 400, и файл за пределами папки entities не должен прочитаться.
+func TestGetEntityHandler_InvalidID(t *testing.T) {
+	setupStorage(t)
+	srv := newTestServer()
+
+	// Кладём "секретный" файл на уровень выше папки entities -
+	// именно его пытается достать запрос с ../secret.
+	secretPath := filepath.Join(filepath.Dir(v.EntitiesUploadDir), "secret.json")
+	if err := os.WriteFile(secretPath, []byte(`{"name":"top secret"}`), 0o644); err != nil {
+		t.Fatalf("write secret file: %v", err)
+	}
+
+	tests := []struct {
+		name string
+		id   string
+	}{
+		{"path traversal", "../secret"},
+		{"nested path traversal", "../../etc/passwd"},
+		{"plain string", "secret"},
+		{"empty", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/entities/x", nil)
+			req.SetPathValue("id", tt.id)
+			rr := httptest.NewRecorder()
+
+			srv.GetEntityHandler()(rr, req)
+
+			if rr.Code != http.StatusBadRequest {
+				t.Fatalf("expected 400, got %d, body: %s", rr.Code, rr.Body.String())
+			}
+			if got := decodeErrorResponse(t, rr); got != "invalid id" {
+				t.Fatalf("unexpected error message: %q", got)
+			}
+		})
+	}
+}
+
+// Валидный UUID, но такого досье нет - ожидаем 404 (проверка UUID
+// не должна ломать обычный сценарий).
+func TestGetEntityHandler_NotFound(t *testing.T) {
+	setupStorage(t)
+	srv := newTestServer()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/entities/x", nil)
+	req.SetPathValue("id", uuid.NewString())
+	rr := httptest.NewRecorder()
+
+	srv.GetEntityHandler()(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d, body: %s", rr.Code, rr.Body.String())
 	}
 }
