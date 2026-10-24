@@ -1,3 +1,3 @@
 # finalServerProj
 
-тесты для GetEntityHandler и GetEvidenceHandler не сделаны
+Учебный проект HTTP-сервера на Go для создания досье, загрузки изображений и получения сохранённых данных.
