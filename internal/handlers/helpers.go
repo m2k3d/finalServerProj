@@ -49,12 +49,16 @@ func processSingleFile(fh *multipart.FileHeader) (string, error) {
 		return "", fmt.Errorf("file_too_large")
 	}
 
-	// Открываем файл
 	file, err := fh.Open()
 	if err != nil {
 		return "", fmt.Errorf("failed to open file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		fileCloseErr := file.Close()
+		if fileCloseErr != nil {
+			err = fileCloseErr
+		}
+	}()
 
 	buffer := make([]byte, 512)
 	if _, err := file.Read(buffer); err != nil && err != io.EOF {
@@ -78,7 +82,12 @@ func processSingleFile(fh *multipart.FileHeader) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("%w: %w", err, ErrInfra)
 	}
-	defer dst.Close()
+	defer func() {
+		dstCloseErr := dst.Close()
+		if dstCloseErr != nil {
+			err = dstCloseErr
+		}
+	}()
 
 	// Копируем данные из оперативной памяти/временного файла в постоянный
 	if _, err := io.Copy(dst, file); err != nil {

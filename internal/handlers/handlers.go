@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -33,8 +34,13 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 
 		if err := r.ParseMultipartForm(v.MaxMemory); err != nil {
 			var maxErr *http.MaxBytesError
+			var pathErr *os.PathError
 			if errors.As(err, &maxErr) {
 				writeJsonHandler(w, "request body exceeds 20MB limit", http.StatusRequestEntityTooLarge)
+			} else if errors.Is(err, multipart.ErrMessageTooLarge) {
+				writeJsonHandler(w, "multipart form exceeds limits", http.StatusRequestEntityTooLarge)
+			} else if errors.As(err, &pathErr) {
+				writeJsonHandler(w, "failed to process multipart form", http.StatusInternalServerError)
 			} else {
 				writeJsonHandler(w, "malformed multipart form", http.StatusBadRequest)
 			}
@@ -284,18 +290,25 @@ func (s *Server) GetEvidenceHandler() http.HandlerFunc {
 		file, err := os.Open(path)
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {
-				writeJsonHandler(w, "file is not exist", http.StatusNotFound)
+				writeJsonHandler(w, "file does not exist", http.StatusNotFound)
 			} else {
-				writeJsonHandler(w, "something went wrong", http.StatusNotFound)
+				writeJsonHandler(w, "something went wrong", http.StatusInternalServerError)
 			}
 			return
 		}
-		defer file.Close()
+		defer func() {
+			if err := file.Close(); err != nil {
+				s.logger.Error("failed to close evidence file",
+					slog.String("path", path),
+					slog.String("error", err.Error()),
+				)
+			}
+		}()
 
 		// check is dir?
 		fileInfo, err := file.Stat()
 		if err != nil {
-			writeJsonHandler(w, "can't get the file statistic", http.StatusNotFound)
+			writeJsonHandler(w, "can't get the file statistic", http.StatusInternalServerError)
 			return
 		}
 		if fileInfo.IsDir() {

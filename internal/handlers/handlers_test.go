@@ -426,6 +426,39 @@ func TestCaseHandler_MalformedMultipart(t *testing.T) {
 	}
 }
 
+func TestCaseHandler_MultipartStorageFailure(t *testing.T) {
+	setupStorage(t)
+	t.Setenv("TMPDIR", filepath.Join(t.TempDir(), "missing"))
+	dossier := validDossierJSON()
+	req := newMultipartRequest(t, &dossier, []testFile{
+		{"large.png", fakeImage(pngMagic, v.MaxMemory+1)},
+	})
+	rr := httptest.NewRecorder()
+
+	newTestServer().CaseHandler()(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d, body: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestCaseHandler_MultipartTooManyParts(t *testing.T) {
+	setupStorage(t)
+	t.Setenv("GODEBUG", "multipartmaxparts=2")
+	dossier := validDossierJSON()
+	req := newMultipartRequest(t, &dossier, []testFile{
+		{"one.png", fakeImage(pngMagic, 100)},
+		{"two.png", fakeImage(pngMagic, 100)},
+	})
+	rr := httptest.NewRecorder()
+
+	newTestServer().CaseHandler()(rr, req)
+
+	if rr.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected 413, got %d, body: %s", rr.Code, rr.Body.String())
+	}
+}
+
 // Общий размер тела запроса больше 20MB - ожидаем 413.
 func TestCaseHandler_RequestBodyTooLarge(t *testing.T) {
 	setupStorage(t)
