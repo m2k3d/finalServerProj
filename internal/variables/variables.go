@@ -1,4 +1,4 @@
-package v // variables, constants
+package variables // variables, constants
 
 const (
 	MaxRequestSize   = 20 << 20 // 20 mb
@@ -11,12 +11,7 @@ var SafeExtensions = map[string]string{
 	"image/jpeg": ".jpg", "image/png": ".png",
 }
 
-var (
-	StoragePath       string
-	Addr              string
-	EntitiesUploadDir = "/entities"
-	EvidenceUploadDir = "/evidence"
-)
+var Addr string
 
 type Dossier struct {
 	Name            string   `json:"name"`

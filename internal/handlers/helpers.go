@@ -12,7 +12,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"finalServerProj/internal/v"
+	"finalServerProj/internal/variables"
 
 	"github.com/google/uuid"
 )
@@ -34,7 +34,7 @@ func writeJsonHandler(w http.ResponseWriter, errMsg string, code int) {
 	json.NewEncoder(w).Encode(map[string]string{"error": errMsg})
 }
 
-func processSingleFile(fh *multipart.FileHeader) (string, error) {
+func (s *Server) processSingleFile(fh *multipart.FileHeader) (string, error) {
 	// Базовая защита от Path Traversal атак
 	filename := filepath.Base(fh.Filename)
 	if filename == "" || filename == "." || filename == ".." {
@@ -45,7 +45,7 @@ func processSingleFile(fh *multipart.FileHeader) (string, error) {
 	if fh.Size == 0 { // == 0 mb?
 		return "", fmt.Errorf("file_empty")
 	}
-	if fh.Size > v.MaxMemory { // > 3 mb?
+	if fh.Size > variables.MaxMemory { // > 3 mb?
 		return "", fmt.Errorf("file_too_large")
 	}
 
@@ -69,13 +69,13 @@ func processSingleFile(fh *multipart.FileHeader) (string, error) {
 	}
 
 	mimeType := http.DetectContentType(buffer)
-	ext, ok := v.SafeExtensions[mimeType]
+	ext, ok := variables.SafeExtensions[mimeType]
 	if !ok {
 		return "", fmt.Errorf("invalid_mime_type")
 	}
 
 	uniqueFilename := uuid.NewString() + ext
-	dstPath := filepath.Join(v.EvidenceUploadDir, uniqueFilename)
+	dstPath := filepath.Join(s.Evidence, uniqueFilename)
 
 	// Создаем файл на диске
 	dst, err := os.Create(dstPath)

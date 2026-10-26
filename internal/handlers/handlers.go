@@ -12,27 +12,33 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"finalServerProj/internal/v"
+	"finalServerProj/internal/variables"
 
 	"github.com/google/uuid"
 )
 
 type Server struct {
-	logger *slog.Logger
+	logger      *slog.Logger
+	StoragePath string
+	Entities    string
+	Evidence    string
 }
 
-func New(l *slog.Logger) *Server {
+func New(l *slog.Logger, StoragePath string, EntitiesUploadDir string, EvidenceUploadDir string) *Server {
 	return &Server{
-		logger: l,
+		logger:      l,
+		StoragePath: StoragePath,
+		Entities:    EntitiesUploadDir,
+		Evidence:    EvidenceUploadDir,
 	}
 }
 
 func (s *Server) CaseHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		r.Body = http.MaxBytesReader(w, r.Body, v.MaxRequestSize)
+		r.Body = http.MaxBytesReader(w, r.Body, variables.MaxRequestSize)
 		defer r.Body.Close()
 
-		if err := r.ParseMultipartForm(v.MaxMemory); err != nil {
+		if err := r.ParseMultipartForm(variables.MaxMemory); err != nil {
 			var maxErr *http.MaxBytesError
 			var pathErr *os.PathError
 			if errors.As(err, &maxErr) {
@@ -55,12 +61,12 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 			return
 		}
 
-		if len(dossierValues[0]) > v.MaxDossierSize {
+		if len(dossierValues[0]) > variables.MaxDossierSize {
 			writeJsonHandler(w, "dossier json size exceeds 1MB limit", http.StatusBadRequest)
 			return
 		}
 
-		var dossier v.Dossier
+		var dossier variables.Dossier
 		if err := json.Unmarshal([]byte(dossierValues[0]), &dossier); err != nil {
 			writeJsonHandler(w, "error while trying to unmarshall the dossier", http.StatusBadRequest)
 			return
@@ -79,25 +85,25 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 			writeJsonHandler(w, "field \" evidence \" doesn't contain a file", http.StatusBadRequest)
 			return
 		}
-		if len(evidenceFiles) > v.MaxEvidenceFiles {
+		if len(evidenceFiles) > variables.MaxEvidenceFiles {
 			writeJsonHandler(w, "field \" evidence \" contains more than 10 files", http.StatusBadRequest)
 			return
 		}
 
-		response := v.UploadResponse{
+		response := variables.UploadResponse{
 			DossierID:      dossierID,
 			SavedEvidence:  make([]string, 0),
-			FailedEvidence: make([]v.FailedEvidence, 0),
+			FailedEvidence: make([]variables.FailedEvidence, 0),
 		}
 
 		var savedSize []int64 // для исоплользования в формуле (которая используются в логировании)
 
 		for _, fileHeader := range evidenceFiles {
-			filename, err := processSingleFile(fileHeader)
+			filename, err := s.processSingleFile(fileHeader)
 			if err != nil {
 				if errors.Is(err, ErrInfra) {
 					for _, name := range response.SavedEvidence {
-						if err := os.Remove(filepath.Join(v.EvidenceUploadDir, name)); err != nil {
+						if err := os.Remove(filepath.Join(s.Evidence, name)); err != nil {
 							slog.Error("error removing the file",
 								slog.String("filename", name),
 								slog.String("error", err.Error()),
@@ -115,7 +121,7 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 					slog.String("error", err.Error()),
 				)
 
-				failed := v.FailedEvidence{
+				failed := variables.FailedEvidence{
 					OriginalFilename: fileHeader.Filename,
 					Reason:           err.Error(),
 				}
@@ -135,7 +141,7 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 			return
 		}
 
-		storedEntity := v.StoredEntity{
+		storedEntity := variables.StoredEntity{
 			ID:              dossierID,
 			Name:            dossier.Name,
 			Description:     dossier.Description,
@@ -144,7 +150,7 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 			EvidenceFiles:   response.SavedEvidence,
 		}
 
-		finalPath := filepath.Join(v.EntitiesUploadDir, dossierID+".json")
+		finalPath := filepath.Join(s.Entities, dossierID+".json")
 		tmpPath := finalPath + ".tmp"
 
 		data, err := json.Marshal(storedEntity)
@@ -154,7 +160,7 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 		}
 		if err := os.WriteFile(tmpPath, data, 0o644); err != nil {
 			for _, name := range response.SavedEvidence {
-				if err := os.Remove(filepath.Join(v.EvidenceUploadDir, name)); err != nil {
+				if err := os.Remove(filepath.Join(s.Evidence, name)); err != nil {
 					slog.Error("error removing the file",
 						slog.String("filename", name),
 						slog.String("error", err.Error()),
@@ -174,7 +180,7 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 		}
 		if err := os.Rename(tmpPath, finalPath); err != nil {
 			for _, name := range response.SavedEvidence {
-				if err := os.Remove(filepath.Join(v.EvidenceUploadDir, name)); err != nil {
+				if err := os.Remove(filepath.Join(s.Evidence, name)); err != nil {
 					slog.Error("error removing the file",
 						slog.String("filename", name),
 						slog.String("error", err.Error()),
@@ -219,7 +225,7 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 	}
 }
 
-func processDossie(d v.Dossier) error {
+func processDossie(d variables.Dossier) error {
 	if strings.TrimSpace(d.Name) == "" {
 		return errors.New("the dossie doesn't contain the name")
 	}
@@ -244,7 +250,7 @@ func (s *Server) GetEntityHandler() http.HandlerFunc {
 			return
 		}
 
-		filePath := filepath.Join(v.EntitiesUploadDir, id+".json")
+		filePath := filepath.Join(s.Entities, id+".json")
 
 		jsonFile, err := os.ReadFile(filePath)
 		if err != nil {
@@ -256,14 +262,14 @@ func (s *Server) GetEntityHandler() http.HandlerFunc {
 			return
 		}
 
-		var entity v.StoredEntity
+		var entity variables.StoredEntity
 		err = json.Unmarshal(jsonFile, &entity)
 		if err != nil {
 			writeJsonHandler(w, "something went wrong", http.StatusInternalServerError)
 			return
 		}
 
-		response := v.EntityResponse{
+		response := variables.EntityResponse{
 			ID:              entity.ID,
 			Name:            entity.Name,
 			Description:     entity.Description,
@@ -285,7 +291,7 @@ func (s *Server) GetEvidenceHandler() http.HandlerFunc {
 		unsafePath := r.PathValue("filename")
 
 		safeName := filepath.Base(unsafePath)
-		path := filepath.Join(v.EvidenceUploadDir, safeName)
+		path := filepath.Join(s.Evidence, safeName)
 
 		file, err := os.Open(path)
 		if err != nil {

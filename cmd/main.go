@@ -15,41 +15,46 @@ import (
 
 	"finalServerProj/internal/handlers"
 	"finalServerProj/internal/logging"
-	"finalServerProj/internal/v"
+	"finalServerProj/internal/variables"
+)
+
+var (
+	EntitiesUploadDir = "/entities"
+	EvidenceUploadDir = "/evidence"
 )
 
 func main() {
 	// CLI PART
-	flag.StringVar(&v.Addr, "addr", ":8080", "addres")
-	flag.StringVar(&v.StoragePath, "storage", "./storage", "path to the storage")
+	flag.StringVar(&variables.Addr, "addr", ":8080", "addres")
+	StoragePath := flag.String("storagePath", "./storage", "path to the storage")
 
 	flag.Parse()
 
 	// SERVER PART
 	logger := logging.New()
-	server := handlers.New(logger)
+	server := handlers.New(logger, *StoragePath, EntitiesUploadDir, EvidenceUploadDir)
 
 	// creating two dirictories for files
-	v.EntitiesUploadDir = filepath.Join(v.StoragePath, v.EntitiesUploadDir)
-	v.EvidenceUploadDir = filepath.Join(v.StoragePath, v.EvidenceUploadDir)
+	server.Entities = filepath.Join(*StoragePath, EntitiesUploadDir)
+	server.Evidence = filepath.Join(*StoragePath, EvidenceUploadDir)
 
-	if err := os.MkdirAll(v.EntitiesUploadDir, 0o755); err != nil {
+	if err := os.MkdirAll(server.Entities, 0o755); err != nil {
 		slog.Error("Failed to create upload directory", slog.String("error", err.Error()))
 		os.Exit(1)
 	}
-	if err := os.MkdirAll(v.EvidenceUploadDir, 0o755); err != nil {
+	if err := os.MkdirAll(server.Evidence, 0o755); err != nil {
 		slog.Error("Failed to create upload directory", slog.String("error", err.Error()))
 		os.Exit(1)
 	}
 
 	mux := http.NewServeMux()
 
-	logger.Info("Server started", slog.String("addr", v.Addr))
+	logger.Info("Server started", slog.String("addr", variables.Addr))
 
 	wrapped := server.RecoveryMiddleware(mux)
 
 	srv := &http.Server{
-		Addr:         v.Addr,
+		Addr:         variables.Addr,
 		Handler:      wrapped,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
@@ -63,7 +68,7 @@ func main() {
 	mux.HandleFunc("GET /api/v1/entities/{id}", server.GetEntityHandler())
 	mux.HandleFunc("GET /api/v1/evidence/{filename}", server.GetEvidenceHandler())
 
-	err := Run(srv, logger, v.Addr)
+	err := Run(srv, logger, variables.Addr)
 	if err != nil {
 		slog.Error("Server error", slog.String("error", err.Error()))
 		os.Exit(1)
