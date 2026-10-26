@@ -92,7 +92,7 @@ func (s *Server) processSingleFile(fh *multipart.FileHeader) (string, error) {
 	// Копируем данные из оперативной памяти/временного файла в постоянный
 	if _, err := io.Copy(dst, file); err != nil {
 		if rmErr := os.Remove(dstPath); rmErr != nil {
-			slog.Error("failed to remove corrupted file",
+			s.Logger.Error("failed to remove corrupted file",
 				slog.String("path", dstPath),
 				slog.String("error", rmErr.Error()),
 			)

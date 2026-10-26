@@ -39,11 +39,11 @@ func main() {
 	server.Evidence = filepath.Join(*StoragePath, EvidenceUploadDir)
 
 	if err := os.MkdirAll(server.Entities, 0o755); err != nil {
-		slog.Error("Failed to create upload directory", slog.String("error", err.Error()))
+		server.Logger.Error("Failed to create upload directory", slog.String("error", err.Error()))
 		os.Exit(1)
 	}
 	if err := os.MkdirAll(server.Evidence, 0o755); err != nil {
-		slog.Error("Failed to create upload directory", slog.String("error", err.Error()))
+		server.Logger.Error("Failed to create upload directory", slog.String("error", err.Error()))
 		os.Exit(1)
 	}
 
@@ -70,7 +70,7 @@ func main() {
 
 	err := Run(srv, logger, variables.Addr)
 	if err != nil {
-		slog.Error("Server error", slog.String("error", err.Error()))
+		server.Logger.Error("Server error", slog.String("error", err.Error()))
 		os.Exit(1)
 
 	}

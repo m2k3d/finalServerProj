@@ -18,7 +18,7 @@ import (
 )
 
 type Server struct {
-	logger      *slog.Logger
+	Logger      *slog.Logger
 	StoragePath string
 	Entities    string
 	Evidence    string
@@ -26,7 +26,7 @@ type Server struct {
 
 func New(l *slog.Logger, StoragePath string, EntitiesUploadDir string, EvidenceUploadDir string) *Server {
 	return &Server{
-		logger:      l,
+		Logger:      l,
 		StoragePath: StoragePath,
 		Entities:    EntitiesUploadDir,
 		Evidence:    EvidenceUploadDir,
@@ -104,7 +104,7 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 				if errors.Is(err, ErrInfra) {
 					for _, name := range response.SavedEvidence {
 						if err := os.Remove(filepath.Join(s.Evidence, name)); err != nil {
-							slog.Error("error removing the file",
+							s.Logger.Error("error removing the file",
 								slog.String("filename", name),
 								slog.String("error", err.Error()),
 							)
@@ -116,7 +116,7 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 					return
 				}
 
-				slog.Error("error uploading specific file",
+				s.Logger.Error("error uploading specific file",
 					slog.String("filename", fileHeader.Filename),
 					slog.String("error", err.Error()),
 				)
@@ -161,7 +161,7 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 		if err := os.WriteFile(tmpPath, data, 0o644); err != nil {
 			for _, name := range response.SavedEvidence {
 				if err := os.Remove(filepath.Join(s.Evidence, name)); err != nil {
-					slog.Error("error removing the file",
+					s.Logger.Error("error removing the file",
 						slog.String("filename", name),
 						slog.String("error", err.Error()),
 					)
@@ -169,7 +169,7 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 			}
 
 			if err := os.Remove(filepath.Join(tmpPath)); err != nil {
-				slog.Error("error removing the file",
+				s.Logger.Error("error removing the file",
 					slog.String("filename", tmpPath),
 					slog.String("error", err.Error()),
 				)
@@ -181,7 +181,7 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 		if err := os.Rename(tmpPath, finalPath); err != nil {
 			for _, name := range response.SavedEvidence {
 				if err := os.Remove(filepath.Join(s.Evidence, name)); err != nil {
-					slog.Error("error removing the file",
+					s.Logger.Error("error removing the file",
 						slog.String("filename", name),
 						slog.String("error", err.Error()),
 					)
@@ -189,7 +189,7 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 			}
 
 			if err := os.Remove(filepath.Join(tmpPath)); err != nil {
-				slog.Error("error removing the file",
+				s.Logger.Error("error removing the file",
 					slog.String("filename", tmpPath),
 					slog.String("error", err.Error()),
 				)
@@ -220,7 +220,7 @@ func (s *Server) CaseHandler() http.HandlerFunc {
 		fmt.Fprintf(os.Stdout, "[ANALYTICS] Dossier ID: %s | Paranormal Index (P): %.2f\n", dossierID, paranormalIndex(savedSize, len(evidenceFiles)))
 
 		if err := json.NewEncoder(w).Encode(response); err != nil {
-			slog.Error("failed to send JSON response", slog.String("error", err.Error()))
+			s.Logger.Error("failed to send JSON response", slog.String("error", err.Error()))
 		}
 	}
 }
@@ -304,7 +304,7 @@ func (s *Server) GetEvidenceHandler() http.HandlerFunc {
 		}
 		defer func() {
 			if err := file.Close(); err != nil {
-				s.logger.Error("failed to close evidence file",
+				s.Logger.Error("failed to close evidence file",
 					slog.String("path", path),
 					slog.String("error", err.Error()),
 				)
@@ -331,7 +331,7 @@ func (s *Server) RecoveryMiddleware(next http.Handler) http.Handler {
 		defer func() {
 			if err := recover(); err != nil {
 				// Логируем саму ошибку и стек-трейс, чтобы понять, где именно упал код
-				s.logger.Error("panic",
+				s.Logger.Error("panic",
 					slog.Any("error", err),
 					slog.String("stack", string(debug.Stack())),
 				)
